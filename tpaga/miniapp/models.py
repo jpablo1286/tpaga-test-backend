@@ -1,6 +1,12 @@
+"""
+Author: Juan Pablo Rivera Velasco
+Version: 1.0
+Correo: jpablo.localhost@gmail.com
+
+Se escribe los modelos a partir del diseño de base de datos, se especifican tipos de datos y relaciones entre tablas.
+"""
 from django.db import models
-# Create your models here.
-#Modelo que define las api-keys validas para usar esta api
+
 class Keys(models.Model):
     id = models.AutoField(primary_key=True)
     key = models.CharField(max_length=250)
@@ -12,8 +18,8 @@ class item(models.Model):
     price = models.IntegerField()
 class order(models.Model):
     id = models.AutoField(primary_key=True)
-    iToken = models.CharField(max_length=500)
-    expiresAt = models.CharField(max_length=250)
+    iToken = models.CharField(null=True,max_length=500)
+    expiresAt = models.CharField(null=True,max_length=250)
     token = models.CharField(null=True,max_length=500)
     tpagaPaymentUrl = models.CharField(null=True,max_length=250)
     status = models.CharField(max_length=80)

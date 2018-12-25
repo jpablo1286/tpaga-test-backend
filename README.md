@@ -30,3 +30,16 @@ se listan a continuación.
 * Escribir las hojas de estilo (CSS)
 * Pruebas y Correciones
 * Despliegue
+
+
+## Como hacer uso de este repositorio
+Este repositorio cuenta con un script que permite desplegar un contenedor Docker, tanto para
+trabajar en pruebas, como para desplegar en modo "produccion", las sintaxis es la siguiente:
+
+```sh
+$ ./start.sh <dev>
+```
+[dev] :se agraga la palabra "dev" para inidicar que se inicia en modo desarrollo, en este modo el directorio "tpaga" es montado
+como volumen en el contenedo Docker, así que los cambios que hagamos en este se reflejaran de inmediato en el contenedor.
+
+Una vez inicia el contenedor este empezara a escuchar peticiones en el puerto 8000, donde usando el estandar Restful.
