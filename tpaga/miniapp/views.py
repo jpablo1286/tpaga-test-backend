@@ -73,7 +73,7 @@ class ListOrders(APIView):
     permission_classes = (IsAuthenticated,)
     def get(self, request):
         orders = order.objects.all()
-        serializer = ItemSerializer(orders, many=True)
+        serializer = OrderSerializer(orders, many=True)
         return Response(serializer.data)
 
 class InfoOrder(APIView):
@@ -111,13 +111,14 @@ class CheckOutOrder(APIView):
         key = Keys.objects.first()
         url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/create'
         auth = "Basic %s"%(key.key)
+        orderUrl = "https://192.168.1.172:4200/orderconfirm/%s"%(serializer.data['id'])
         expDate = datetime.datetime.utcnow() + timedelta(days=1)
         expDateForm = expDate.strftime('%Y-%m-%dT%H:%M:%S.%f-05:00')[:-3]
         headers = {"Authorization": auth, "Cache-Control":"no-cache", "Content-Type":"application/json"}
         data = {
         "cost":serializer.data['cost'],
-        "purchase_details_url":"https://www.juanrivera.org/",
-        "voucher_url": "https://www.juanrivera.org/",
+        "purchase_details_url":orderUrl,
+        "voucher_url": orderUrl,
         "idempotency_token":serializer.data['iToken'],
         "order_id":serializer.data['id'],
         "terminal_id":"web_app",
@@ -146,7 +147,7 @@ class ConfirmOrder(APIView):
             message = {'error': 'La orden no existe'}
             return Response(message,status=404)
         serializer = OrderSerializer(myorder)
-        if serializer.data['status'] != "created":
+        if serializer.data['status'] != "created" and serializer.data['status'] != "delivered":
             message = {'error': 'La orden necesita ser procesada antes de ser confirmada'}
             return Response(message,status=400)
         key = Keys.objects.first()
@@ -168,7 +169,7 @@ class ConfirmOrder(APIView):
 
 class RefundOrder(APIView):
     permission_classes = (IsAuthenticated,)
-    def post(self, request, id):
+    def get(self, request, id):
         try:
             myorder = order.objects.get(id=id)
         except order.DoesNotExist:

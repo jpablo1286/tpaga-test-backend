@@ -9,8 +9,10 @@ dichas URLs.
 from django.contrib import admin
 from django.urls import path
 from miniapp import views
+from rest_framework.authtoken.views import obtain_auth_token
 
 urlpatterns = [
+    path('api-token-auth', obtain_auth_token, name='api_token_auth'),
     path('key/create', views.CreateKey.as_view(), name='CreateKey'), #almacena las llaves de integración de la tienda con terceros, en este caso tpaga
     # Mapeo de metodos para creación, listado y eliminación de items, se omiten otros por sencilles de implementación
     path('item/list', views.ListItems.as_view(), name='ListItems'),
