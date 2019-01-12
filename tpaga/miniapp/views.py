@@ -6,10 +6,12 @@ Correo: jpablo.localhost@gmail.com
 Se definene las vista (acciones) para el mini comercio
 """
 from django.shortcuts import render
+from django.conf import settings
 import requests
 import datetime
 import json
 import hashlib
+from miniapp.apps import MiniappConfig
 from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -99,6 +101,8 @@ class CreateOrder(APIView):
 class CheckOutOrder(APIView):
 
     def post(self, request, id):
+        #Obtiene los parametro de configuracion basado en la variable ENV
+        myConfig = MiniappConfig.getConfig(settings.ENV)
         try:
             myorder = order.objects.get(id=id)
         except order.DoesNotExist:
@@ -109,9 +113,11 @@ class CheckOutOrder(APIView):
             message = {'error': 'La orden ya ha sido procesada'}
             return Response(message,status=400)
         key = Keys.objects.first()
-        url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/create'
+        url = myConfig['TPAGA_API_BASE_URL'] +'/'+ myConfig['TPAGA_PAYMENT_REQUEST_PATH'] + '/create'
+        #url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/create'
         auth = "Basic %s"%(key.key)
-        orderUrl = "https://192.168.1.172:4200/orderconfirm/%s"%(serializer.data['id'])
+        #orderUrl = "https://miniapp.juanrivera.org/orderconfirm/%s"%(serializer.data['id'])
+        orderUrl = myConfig['MINIAPP_BASE_URL'] + '/orderconfirm/' + str(serializer.data['id'])
         expDate = datetime.datetime.utcnow() + timedelta(days=1)
         expDateForm = expDate.strftime('%Y-%m-%dT%H:%M:%S.%f-05:00')[:-3]
         headers = {"Authorization": auth, "Cache-Control":"no-cache", "Content-Type":"application/json"}
@@ -126,10 +132,23 @@ class CheckOutOrder(APIView):
         "user_ip_address": request.META.get('REMOTE_ADDR'),
         "expires_at": expDateForm
         }
-        myResult=requests.post(url, json=data, headers=headers)
+        # Se agraga manejo de excepciones para consultar el API de tpaga
+        try:
+            myResult=requests.post(url, json=data, headers=headers)
+        #Excepcion que maneja el TimeOut
+        except requests.exceptions.Timeout:
+            message = {'error': 'Se agoto el tiempo de respuesta tratando de contactar el API de tpaga'}
+            return Response(message,status=myResult.status_code)
+        #Excepcion que maneja cualquier otro error y se hace un bypass del status hacia la UI
+        except requests.exceptions.RequestException as e:
+            message = {'error': e }
+            return Response(message,status=myResult.status_code)
+
         myJsonResult=json.loads(myResult.text)
         if 'error_code' in myJsonResult:
-            return Response(myJsonResult,status=400)
+            #Si hay un error del lado del api de tpaga se hace bypass al codigo del
+            #error y el cuerpo del mensaje.
+            return Response(myJsonResult,status=myResult.status_code)
         updatedSerializer = OrderSerializer(myorder, data=serializer.data)
         if updatedSerializer.is_valid():
             updatedSerializer.save(token= myJsonResult['token'],tpagaPaymentUrl=myJsonResult['tpaga_payment_url'],status=myJsonResult['status'],expiresAt=myJsonResult['expires_at'])
@@ -141,6 +160,8 @@ class CheckOutOrder(APIView):
 class ConfirmOrder(APIView):
 
     def post(self, request, id):
+        #Obtiene los parametro de configuracion basado en la variable ENV
+        myConfig = MiniappConfig.getConfig(settings.ENV)
         try:
             myorder = order.objects.get(id=id)
         except order.DoesNotExist:
@@ -151,14 +172,28 @@ class ConfirmOrder(APIView):
             message = {'error': 'La orden necesita ser procesada antes de ser confirmada'}
             return Response(message,status=400)
         key = Keys.objects.first()
-        url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/'+serializer.data['token']+'/info'
+        #url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/'+serializer.data['token']+'/info'
+        url = myConfig['TPAGA_API_BASE_URL'] + '/' + myConfig['TPAGA_PAYMENT_REQUEST_PATH'] + '/' + serializer.data['token']+'/info'
         auth = "Basic %s"%(key.key)
         headers = {"Authorization": auth, "Cache-Control":"no-cache", "Content-Type":"application/json"}
         data = {}
-        myResult=requests.get(url, json=data, headers=headers)
+        # Se agraga manejo de excepciones para consultar el API de tpaga
+        try:
+            myResult=requests.get(url, json=data, headers=headers)
+        #Excepcion que maneja el TimeOut
+        except requests.exceptions.Timeout:
+            message = {'error': 'Se agoto el tiempo de respuesta tratando de contactar el API de tpaga'}
+            return Response(message,status=myResult.status_code)
+        #Excepcion que maneja cualquier otro error y se hace un bypass del status hacia la UI
+        except requests.exceptions.RequestException as e:
+            message = {'error': e }
+            return Response(message,status=myResult.status_code)
+
         myJsonResult=json.loads(myResult.text)
         if 'error_code' in myJsonResult:
-            return Response(myJsonResult,status=400)
+            #Si hay un error del lado del api de tpaga se hace bypass al codigo del
+            #error y el cuerpo del mensaje.
+            return Response(myJsonResult,status=myResult.status_code)
         updatedSerializer = OrderSerializer(myorder, data=serializer.data)
         if updatedSerializer.is_valid():
             updatedSerializer.save(status=myJsonResult['status'])
@@ -170,6 +205,8 @@ class ConfirmOrder(APIView):
 class RefundOrder(APIView):
     permission_classes = (IsAuthenticated,)
     def get(self, request, id):
+        #Obtiene los parametro de configuracion basado en la variable ENV
+        myConfig = MiniappConfig.getConfig(settings.ENV)
         try:
             myorder = order.objects.get(id=id)
         except order.DoesNotExist:
@@ -180,14 +217,28 @@ class RefundOrder(APIView):
             message = {'error': 'La orden solo puedes ser reembolsada una vez sea confirmada'}
             return Response(message,status=400)
         key = Keys.objects.first()
-        url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/refund'
+        #url = 'https://stag.wallet.tpaga.co/merchants/api/v1/payment_requests/refund'
+        url = myConfig['TPAGA_API_BASE_URL'] + '/' + myConfig['TPAGA_PAYMENT_REQUEST_PATH'] + '/refund'
         auth = "Basic %s"%(key.key)
         headers = {"Authorization": auth, "Cache-Control":"no-cache", "Content-Type":"application/json"}
         data = {'payment_request_token':serializer.data['token']}
-        myResult=requests.post(url, json=data, headers=headers)
+        # Se agraga manejo de excepciones para consultar el API de tpaga
+        try:
+            myResult=requests.post(url, json=data, headers=headers)
+        #Excepcion que maneja el TimeOut
+        except requests.exceptions.Timeout:
+            message = {'error': 'Se agoto el tiempo de respuesta tratando de contactar el API de tpaga'}
+            return Response(message,status=myResult.status_code)
+        #Excepcion que maneja cualquier otro error y se hace un bypass del status hacia la UI
+        except requests.exceptions.RequestException as e:
+            message = {'error': e }
+            return Response(message,status=myResult.status_code)
+
         myJsonResult=json.loads(myResult.text)
         if 'error_code' in myJsonResult:
-            return Response(myJsonResult,status=400)
+            #Si hay un error del lado del api de tpaga se hace bypass al codigo del
+            #error y el cuerpo del mensaje.
+            return Response(myJsonResult,status=myResult.status_code)
         updatedSerializer = OrderSerializer(myorder, data=serializer.data)
         if updatedSerializer.is_valid():
             updatedSerializer.save(status=myJsonResult['status'])

@@ -28,6 +28,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+# Variable de entorno para definir si es produccion o pruebas, y asi cargar
+# las configuraciones correspondientes
+
+ENV = 'dev'
 
 # Application definition
 
